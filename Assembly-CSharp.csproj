@@ -56,20 +56,13 @@
     <Analyzer Include="C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\Extensions\Microsoft\Visual Studio Tools for Unity\Analyzers\Microsoft.Unity.Analyzers.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\Test\Scripts\TransformShaker.cs" />
-    <Compile Include="Assets\Collisions.cs" />
-    <Compile Include="Assets\BoidBehaviour.cs" />
-    <Compile Include="Assets\Test\Scripts\Perlin.cs" />
-    <Compile Include="Assets\Walls.cs" />
+    <Compile Include="Assets\copyPeople.cs" />
+    <Compile Include="Assets\makeWalls.cs" />
     <Compile Include="Assets\SFM.cs" />
-    <Compile Include="Assets\BoidController.cs" />
-    <Compile Include="Assets\Example.cs" />
-    <Compile Include="Assets\Test\Scripts\Tester.cs" />
     <Compile Include="Assets\Move.cs" />
-    <Compile Include="Assets\Test\Scripts\Shaker.cs" />
-    <Compile Include="Assets\Test\Scripts\SimpleRotation.cs" />
     <Compile Include="Assets\roles.cs" />
     <Compile Include="Assets\People.cs" />
+    <Compile Include="Assets\Walls.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">

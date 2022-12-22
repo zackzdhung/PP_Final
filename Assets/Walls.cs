@@ -4,27 +4,10 @@ using UnityEngine;
 
 public class Walls : MonoBehaviour
 {
-    public GameObject Wall;
-    public GameObject Corner;
     // Start is called before the first frame update
     void Start()
     {
-        // use 8 pieces
-        // Instantiate(Wall, new Vector3((float)10.5, (float)0.5, (float)5.5), transform.rotation);
-        Instantiate(Wall, new Vector3((float)10.5, (float)0.5, (float)-5.5), transform.rotation);
-        Instantiate(Wall, new Vector3((float)-10.5, (float)0.5, (float)5.5), transform.rotation);
-        Instantiate(Wall, new Vector3((float)-10.5, (float)0.5, (float)-5.5), transform.rotation);
-
-        // Instantiate(Wall, new Vector3((float)5.5, (float)0.5, (float)10.5), Quaternion.Euler(0f, 90f, 0f));
-        Instantiate(Wall, new Vector3((float)5.5, (float)0.5, (float)-10.5), Quaternion.Euler(0f, 90f, 0f));
-        Instantiate(Wall, new Vector3((float)-5.5, (float)0.5, (float)10.5), Quaternion.Euler(0f, 90f, 0f));
-        Instantiate(Wall, new Vector3((float)-5.5, (float)0.5, (float)-10.5), Quaternion.Euler(0f, 90f, 0f));
-
-        // fill corners
-        // Instantiate(Corner, new Vector3((float)10.5, (float)0.5, (float)10.5), transform.rotation);
-        Instantiate(Corner, new Vector3((float)10.5, (float)0.5, (float)-10.5), transform.rotation);
-        Instantiate(Corner, new Vector3((float)-10.5, (float)0.5, (float)10.5), transform.rotation);
-        Instantiate(Corner, new Vector3((float)-10.5, (float)0.5, (float)-10.5), transform.rotation);
+        Debug.Log("I am a wall");
     }
 
     // Update is called once per frame

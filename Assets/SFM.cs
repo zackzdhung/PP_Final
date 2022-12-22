@@ -1,32 +1,30 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data;
 using UnityEngine;
 using Random = System.Random;
 
 public class SFM : MonoBehaviour
 {
-    public People people;
+    public People me;
     public Walls wall;
     // The unit of distance : (m)
     // The unit of time : (s)
     // Only one exit 
-    public Vector3 Exit;
-
+    public Vector3 Exit = new Vector3(10, 0, 10);
 
 
     // The desired speed
-    static Random random = new Random();
+    static Random random = new System.Random();
     private static double mean = 1.34;
     private static double stddev = 0.26;
     private static double desiredSpeed = SampleGaussian(random, mean, stddev);
     // maximun speed
     private double max_speed = 1.3*desiredSpeed;
-    // initial speed is (0, 0, 0)
-    private Vector3 currentSpeed = new Vector3(0, 0, 0);
 
     // compute frequency
-    public float frequency = 2;
+    private float frequency = 0.1f;
 
     // default parameters in paper
     private float relaxationTime = 0.5f;
@@ -44,17 +42,19 @@ public class SFM : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-
     }
 
     // Update is called once per frame
     void Update()
     {
+        Vector3 moving = moveDistance(me);
+        //Debug.Log(moving);
+        me.transform.position += moving;
         
     }
 
 
-    void speedCompute(People me)
+    Vector3 moveDistance(People me)
     {
         Vector3 Motivate = new Vector3(0, 0, 0);
 
@@ -62,28 +62,44 @@ public class SFM : MonoBehaviour
         Motivate += wish;
 
         var otherPeople = FindObjectsOfType<People>();
-        for (int i = 0; i < otherPeople.Length; i++)
+        if (otherPeople.Length > 0)
         {
-            if(Vector3.Distance(me.transform.position, otherPeople[i].transform.position) <= me.radius)
+            //Debug.Log("otherPeople.Length");
+            //Debug.Log(otherPeople.Length);
+            for (int i = 0; i < otherPeople.Length; i++)
             {
-                Vector3 peopleRepulsion = V_ab_gradient(me, otherPeople[i]);
-                Motivate += peopleRepulsion;
+                //Debug.Log(me.transform.position);
+                //Debug.Log(otherPeople[i].transform.position);
+                //Debug.Log(Vector3.Distance(me.transform.position, otherPeople[i].transform.position));
+                //Debug.Log(me.radius);
+                if(Vector3.Distance(me.transform.position, otherPeople[i].transform.position) <= me.radius)
+                {
+                    //Debug.Log("computing the force with others");
+                    Vector3 peopleRepulsion = V_ab_gradient(me, otherPeople[i]);
+                    Motivate += peopleRepulsion;
+                }
             }
         }
+            
 
         var Walls = FindObjectsOfType<Walls>();
         // only consider the nearest wall
-        Walls nearest_wall = Walls[0];
-        for (int i = 1; i < Walls.Length; i++)
+        if (Walls.Length > 0)
         {
-            if (Vector3.Distance(me.transform.position, Walls[i].transform.position) < Vector3.Distance(me.transform.position, nearest_wall.transform.position))
+            //Debug.Log("walls Length > 0");
+            Walls nearest_wall = Walls[0];
+            for (int i = 1; i < Walls.Length; i++)
             {
-                nearest_wall = Walls[i];
+                if (Vector3.Distance(me.transform.position, Walls[i].transform.position) < Vector3.Distance(me.transform.position, nearest_wall.transform.position))
+                {
+                    nearest_wall = Walls[i];
+                }
             }
-        }
 
-        Vector3 WallRepulsion = U_ab_gradient(me, nearest_wall);
-        Motivate += WallRepulsion;
+            Vector3 WallRepulsion = U_ab_gradient(me, nearest_wall);
+            Motivate += WallRepulsion;
+        }
+        
         // summed all forces to get total motivate
         // consider the fluctuation term if need
 
@@ -94,9 +110,10 @@ public class SFM : MonoBehaviour
         // speed should bounded by maximun speed
         speed = speedBound(speed);
 
+        //mpdate my speed
         me.speed = speed;
 
-
+        return speed/50;
     }
 
     // The force computed by my wish
@@ -107,7 +124,7 @@ public class SFM : MonoBehaviour
         Vector3 goalDirect = Vector3.Normalize(Exit - locate);
         Vector3 speed = (float)desiredSpeed * goalDirect;
 
-        Vector3 Force = (speed - currentSpeed) / relaxationTime;
+        Vector3 Force = (speed - me.speed) / relaxationTime;
 
         return Force;
     }
@@ -123,11 +140,37 @@ public class SFM : MonoBehaviour
         Vector3 e_beta = othersPosition;
         Vector3 nextPosition = v_beta * frequency * e_beta;
 
-        double r_ab_norm = Vector3.Distance(r_ab, Vector3.zero);
-        double r_ab_step_norm = Vector3.Distance(r_ab - v_beta * frequency * e_beta, Vector3.zero);
+        if (r_ab == Vector3.zero)
+        {
+            // reference myself
+            return Vector3.zero;
+        }
 
+        double r_ab_norm = Vector3.Distance(r_ab, Vector3.zero);
+        //Debug.Log(r_ab_norm);
+        if (r_ab_norm == 0)
+        {
+            //Debug.Log("r_ab_norm = 0, error");
+            r_ab_norm = 0.00001;
+        }
+        double r_ab_step_norm = Vector3.Distance(r_ab - nextPosition, Vector3.zero);
+        //Debug.Log(r_ab_step_norm);
+        if (r_ab_step_norm == 0)
+        {
+            //Debug.Log("r_ab_step_norm = 0, error");
+            r_ab_step_norm = 0.00001;
+        }
+        // b : the semi-minor axis of the ellipse
+        //Debug.Log(Math.Pow(r_ab_norm + r_ab_step_norm, 2));
+        //Debug.Log(Math.Pow(step, 2));
         double b = Math.Sqrt(Math.Pow(r_ab_norm + r_ab_step_norm, 2) - Math.Pow(step, 2)) / 2;
-        double scalar = -V_0_ab * Mathf.Exp((float)(-b / sigma)) * (r_ab_norm + r_ab_step_norm) / (4 * sigma * b);
+        //Debug.Log(b);
+        if (b == 0)
+        {
+            //Debug.Log("b = 0, error");
+            b = 0.00001;
+        }
+        double scalar = V_0_ab * Mathf.Exp((float)(-b / sigma)) * (r_ab_norm + r_ab_step_norm) / (4 * sigma * b);
 
         double x_term = r_ab.x / r_ab_norm + (r_ab.x - nextPosition.x) / r_ab_step_norm;
         double y_term = r_ab.y / r_ab_norm + (r_ab.y - nextPosition.y) / r_ab_step_norm;
@@ -145,16 +188,26 @@ public class SFM : MonoBehaviour
         Vector3 WallPosition = wall.transform.position;
         Vector3 r_ab = myPosition - WallPosition;
         double r_ab_norm = Vector3.Distance(r_ab, Vector3.zero);
-        double scalar = -U_0_ab * Mathf.Exp((float)(-r_ab_norm / R)) / (R * r_ab_norm);
+        //Debug.Log(r_ab_norm);
+        if (r_ab_norm == 0)
+        {
+            //Debug.Log("r_ab_norm = 0, error");
+        }
+        double scalar = U_0_ab * Mathf.Exp((float)(-r_ab_norm / R)) / (R * r_ab_norm);
 
         return new Vector3((float)(scalar * myPosition.x), (float)(scalar * myPosition.y), (float)(scalar * myPosition.z));
     }
 
     Vector3 speedBound(Vector3 speed)
     {
-        if (max_speed < Vector3.Distance(speed, Vector3.zero))
+        if (Vector3.Distance(speed, Vector3.zero) == 0)
         {
-            double scalar = max_speed / Vector3.Distance(speed, Vector3.zero);
+            //Debug.Log("r_ab_norm = 0, error");
+        }
+        double mySpeed = Vector3.Distance(speed, Vector3.zero);
+        if (max_speed < mySpeed)
+        {
+            double scalar = max_speed / mySpeed;
             speed = (float)scalar * speed;
         }
         return speed;
@@ -170,6 +223,7 @@ public class SFM : MonoBehaviour
         double y1 = Math.Sqrt(-2.0 * Math.Log(x1)) * Math.Cos(2.0 * Math.PI * x2);
         return y1 * stddev + mean;
     }
+
     // There are no attract designed by paper
     //Vector3 W_ai_gradient(Vector3 myPosition, Vector3 attractPosition)
     //{
