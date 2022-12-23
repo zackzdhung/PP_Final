@@ -18,7 +18,7 @@ public class copyPeople : MonoBehaviour
     {
         for (var i = 0; i < numberOfPeople; i++)
         {
-            Vector3 position = new Vector3(Random.Range(10, -10), (float)0.5, Random.Range(10, -10));
+            Vector3 position = new Vector3(Random.Range(49, -49), 0, Random.Range(49, -49));
             copyHuman = Instantiate(human);
             copyHuman.transform.localPosition = position;
 

@@ -12,7 +12,7 @@ public class SFM : MonoBehaviour
     // The unit of distance : (m)
     // The unit of time : (s)
     // Only one exit 
-    public Vector3 Exit = new Vector3(10, 0, 10);
+    public Exit exit;
 
 
     // The desired speed
@@ -24,7 +24,7 @@ public class SFM : MonoBehaviour
     private double max_speed = 1.3*desiredSpeed;
 
     // compute frequency
-    private float frequency = 0.1f;
+    private float frequency = 0.01f;
 
     // default parameters in paper
     private float relaxationTime = 0.5f;
@@ -36,7 +36,7 @@ public class SFM : MonoBehaviour
 
     // use for compute repulsion with walls 
     private double U_0_ab = 10;
-    private double R = 0.2;
+    private double R = 0.2;     // control the behavior while people near to the wall
 
 
     // Start is called before the first frame update
@@ -58,7 +58,17 @@ public class SFM : MonoBehaviour
     {
         Vector3 Motivate = new Vector3(0, 0, 0);
 
-        Vector3 wish = Wish_Force(me);
+        var exits = FindObjectsOfType<Exit>();
+        // only consider the nearest exit
+        Exit myGaol = exits[0];
+        for(int i = 1; i < exits.Length; i++)
+        {
+            if(Vector3.Distance(me.transform.position, exits[i].transform.position) < Vector3.Distance(me.transform.position, myGaol.transform.position))
+            {
+                myGaol = exits[i];
+            }
+        }
+        Vector3 wish = Wish_Force(me, myGaol);
         Motivate += wish;
 
         var otherPeople = FindObjectsOfType<People>();
@@ -113,15 +123,16 @@ public class SFM : MonoBehaviour
         //mpdate my speed
         me.speed = speed;
 
-        return speed/50;
+        return speed;
     }
 
     // The force computed by my wish
     // Consider the nearest exit only
-    Vector3 Wish_Force(People me)
+    Vector3 Wish_Force(People me, Exit exit)
     {
         Vector3 locate = me.transform.position;
-        Vector3 goalDirect = Vector3.Normalize(Exit - locate);
+        Vector3 exitPosition = exit.transform.position;
+        Vector3 goalDirect = Vector3.Normalize(exitPosition - locate);
         Vector3 speed = (float)desiredSpeed * goalDirect;
 
         Vector3 Force = (speed - me.speed) / relaxationTime;
@@ -193,7 +204,7 @@ public class SFM : MonoBehaviour
         {
             //Debug.Log("r_ab_norm = 0, error");
         }
-        double scalar = U_0_ab * Mathf.Exp((float)(-r_ab_norm / R)) / (R * r_ab_norm);
+        double scalar = -U_0_ab * Mathf.Exp((float)(-r_ab_norm / R)) / (R * r_ab_norm);
 
         return new Vector3((float)(scalar * myPosition.x), (float)(scalar * myPosition.y), (float)(scalar * myPosition.z));
     }

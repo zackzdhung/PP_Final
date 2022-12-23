@@ -60,9 +60,12 @@
     <Compile Include="Assets\makeWalls.cs" />
     <Compile Include="Assets\SFM.cs" />
     <Compile Include="Assets\Move.cs" />
-    <Compile Include="Assets\roles.cs" />
-    <Compile Include="Assets\People.cs" />
     <Compile Include="Assets\Walls.cs" />
+    <Compile Include="Assets\People.cs" />
+    <Compile Include="Assets\roles.cs" />
+    <Compile Include="Assets\Exit.cs" />
+    <Compile Include="Assets\buildWall.cs" />
+    <Compile Include="Assets\CollidAndDestroy.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
