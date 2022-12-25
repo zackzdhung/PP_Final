@@ -41,15 +41,17 @@
     <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>
   </PropertyGroup>
   <ItemGroup>
-     <Compile Include="Assets/copyPeople.cs" />
-     <Compile Include="Assets/makeWalls.cs" />
-     <Compile Include="Assets/SFM.cs" />
-     <Compile Include="Assets/roles.cs" />
-     <Compile Include="Assets/Wall.cs" />
-     <Compile Include="Assets/People.cs" />
-     <Compile Include="Assets/Exit.cs" />
+     <Compile Include="Assets/Scripts/CreateObjects.cs" />
+     <Compile Include="Assets/Scripts/MakeWalls.cs" />
+     <Compile Include="Assets/Scripts/SFM.cs" />
+     <Compile Include="Assets/Scripts/Wall.cs" />
+     <Compile Include="Assets/Scripts/People.cs" />
+     <Compile Include="Assets/Scripts/Exit.cs" />
+     <Compile Include="Assets/Scripts/CollidAndDestroy.cs" />
+     <Compile Include="Assets/Scripts/BuildWall.cs" />
      <Folder Include="Assets" />
      <Folder Include="Assets/Materials" />
+     <Folder Include="Assets/Scripts" />
      <Folder Include="Assets/Scenes" />
      <Reference Include="UnityEngine">
      <HintPath>/Applications/Unity/Hub/Editor/2021.3.15f1/Unity.app/Contents/Managed/UnityEngine/UnityEngine.dll</HintPath>

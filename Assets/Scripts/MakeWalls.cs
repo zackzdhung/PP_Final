@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class makeWalls : MonoBehaviour
+public class MakeWalls : MonoBehaviour
 {
     public GameObject Wall;
     public GameObject Corner;

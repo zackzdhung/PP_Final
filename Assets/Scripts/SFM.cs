@@ -2,13 +2,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
 using Random = System.Random;
 
 public class SFM : MonoBehaviour
 {
-    public People me;
+    // public People me;
     // public Walls wall;
     // The unit of distance : (m)
     // The unit of time : (s)
@@ -17,7 +18,7 @@ public class SFM : MonoBehaviour
 
 
     // The desired speed
-    private static Random random = new();
+    private static readonly Random MRandom = new();
     private const double Mean = 1.34;
     private const double Stddev = 0.26;
 
@@ -26,10 +27,10 @@ public class SFM : MonoBehaviour
     private readonly double _maxSpeed = 1.3 * DesiredSpeed;
 
     // compute frequency
-    private const float frequency = 0.1f;
+    private const float Frequency = 0.1f;
 
     // default parameters in paper
-    private const float relaxationTime = 0.5f;
+    private const float RelaxationTime = 0.5f;
 
 
     // use for compute repulsion with other people
@@ -42,16 +43,24 @@ public class SFM : MonoBehaviour
 
     private Wall[] _walls;
     private People[] _peoples;
+    private Vector3[] _moveDistances;
     private Exit[] _exits;
-    private Exit _nearestExit;
-
+    private Exit[] _nearestExits;
+    
     // Start is called before the first frame update
     void Start()
     {
+        // _init = false;
         _walls = FindObjectsOfType<Wall>();
         _peoples = FindObjectsOfType<People>();
         _exits = FindObjectsOfType<Exit>();
-        _nearestExit = _exits[0];
+        _nearestExits = new Exit[_peoples.Length];
+        for (int i = 0; i < _nearestExits.Length; i++)
+        {
+            _nearestExits[i] = _exits[0];
+        }
+        
+        _moveDistances = new Vector3[_peoples.Length];
         CheckOutsideTheWall();
     }
 
@@ -63,7 +72,7 @@ public class SFM : MonoBehaviour
             {
                 var vec = p.transform.position - w.transform.position;
                 var dist = vec.magnitude;
-                var r = me.radius + w.radius;
+                var r = p.radius + w.radius;
                 if (dist > r) continue;
                 p.transform.position += vec / dist * r;
             }
@@ -73,38 +82,52 @@ public class SFM : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        UpdateNearestExit();
-        Vector3 moving = MoveDistance(me);
-        //Debug.Log(moving);
-        me.transform.position += moving;
-        
+        UpdateNearestExits();
+        UpdateMoveDistance();
+        PeopleMove();
     }
 
-    private void UpdateNearestExit()
+    private void PeopleMove()
     {
-        // Maintain _nearestExit
-        var mExit = _nearestExit;
-        var mDist = (mExit.transform.position - me.transform.position).magnitude;
-        foreach (var e in _exits)
+        for (int i = 0; i < _peoples.Length; i++)
         {
-            var dist = (e.transform.position - me.transform.position).magnitude;
-            if (dist < mDist)
+            _peoples[i].transform.position += _moveDistances[i];
+        }
+    }
+
+    private void UpdateMoveDistance()
+    {
+        for (int i = 0; i < _peoples.Length; i++)
+        {
+            _moveDistances[i] = MoveDistance(_peoples[i], _nearestExits[i]);
+        }
+    }
+
+    private void UpdateNearestExits()
+    {
+        // Maintain _nearestExits
+        for (int i = 0; i < _peoples.Length; i++)
+        {
+            var mExit = _nearestExits[i];
+            var mDist = (mExit.transform.position - _peoples[i].transform.position).magnitude;
+            foreach (var e in _exits)
             {
+                var dist = (e.transform.position - _peoples[i].transform.position).magnitude;
+                if (dist > mDist) continue;
                 mExit = e;
                 mDist = dist;
             }
+            _nearestExits[i] = mExit;
         }
-        _nearestExit = mExit;
     }
 
 
-    Vector3 MoveDistance(People myself)
+    Vector3 MoveDistance(People myself, Exit nearestExit)
     {
         Vector3 motivate = new Vector3(0, 0, 0);
-        Vector3 wish = Wish_Force(myself);
+        Vector3 wish = Wish_Force(myself, nearestExit);
         motivate += wish;
 
-        // var _peopleArray = FindObjectsOfType<People>();
         if (_peoples.Length > 0)
         {
             //Debug.Log("otherPeople.Length");
@@ -125,7 +148,6 @@ public class SFM : MonoBehaviour
         }
             
 
-        // var _wallsArray = FindObjectsOfType<Walls>();
         // only consider the nearest wall
         if (_walls.Length > 0)
         {
@@ -148,7 +170,7 @@ public class SFM : MonoBehaviour
 
 
         // compute the speed
-        Vector3 speed = motivate * frequency;
+        Vector3 speed = motivate * Frequency;
 
         // speed should bounded by maximum speed
         speed = speedBound(speed);
@@ -161,13 +183,13 @@ public class SFM : MonoBehaviour
 
     // The force computed by my wish
     // Consider the nearest exit only
-    Vector3 Wish_Force(People myself)
+    Vector3 Wish_Force(People myself, Exit nearestExit)
     {
         Vector3 locate = myself.transform.position;
-        Vector3 goalDirect = Vector3.Normalize(_nearestExit.transform.position - locate);
+        Vector3 goalDirect = Vector3.Normalize(nearestExit.transform.position - locate);
         Vector3 speed = (float)DesiredSpeed * goalDirect;
 
-        Vector3 force = (speed - myself.speed) / relaxationTime;
+        Vector3 force = (speed - myself.speed) / RelaxationTime;
 
         return force;
     }
@@ -179,9 +201,9 @@ public class SFM : MonoBehaviour
         Vector3 myPosition = myself.transform.position;
         Vector3 othersPosition = other.transform.position;
         Vector3 r_ab = myPosition - othersPosition;
-        double step = v_beta * frequency;
+        double step = v_beta * Frequency;
         Vector3 e_beta = othersPosition;
-        Vector3 nextPosition = v_beta * frequency * e_beta;
+        Vector3 nextPosition = v_beta * Frequency * e_beta;
 
         if (r_ab == Vector3.zero)
         {
@@ -260,8 +282,8 @@ public class SFM : MonoBehaviour
     {
         // The method requires sampling from a uniform random of (0,1]
         // but Random.NextDouble() returns a sample of [0,1).
-        double x1 = 1 - random.NextDouble();
-        double x2 = 1 - random.NextDouble();
+        double x1 = 1 - MRandom.NextDouble();
+        double x2 = 1 - MRandom.NextDouble();
 
         double y1 = Math.Sqrt(-2.0 * Math.Log(x1)) * Math.Cos(2.0 * Math.PI * x2);
         return y1 * Stddev + Mean;

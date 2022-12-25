@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class buildWall : MonoBehaviour
+public class BuildWall : MonoBehaviour
 {
     public Wall wall;
     public Wall copyWall;
