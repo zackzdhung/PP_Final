@@ -11,7 +11,7 @@ public class People : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        Debug.Log("I am a human");
+        // Debug.Log("I am a human");
     }
 
     // Update is called once per frame

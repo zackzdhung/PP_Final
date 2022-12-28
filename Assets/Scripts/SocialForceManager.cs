@@ -1,0 +1,384 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using Unity.Jobs;
+using UnityEngine.Jobs;
+using Unity.Collections;
+using Unity.Burst;
+using Unity.Mathematics;
+using Unity.Profiling;
+
+
+// TODO: Burst Compiler ? SIMD ?
+
+public struct Pedestrian
+{
+    public float3 position;
+    public float3 velocity;
+    public float3 desiredDirection;
+    public float desiredSpeed;
+    public float maxSpeed;
+}
+
+public struct Border
+{
+    public float3 position;
+    // TODO: rectangle borders
+}
+
+public struct Destination
+{
+    public float3 position;
+}
+
+
+// [BurstCompile]
+public struct UpdatePedestriansJob : IJobParallelFor
+{
+    [ReadOnly]
+    public NativeArray<Pedestrian> prevPedestrians;
+    [WriteOnly]
+    public NativeArray<Pedestrian> curPedestrians;
+    [ReadOnly]
+    public NativeArray<Destination> destinations;
+    [ReadOnly]
+    public NativeArray<Border> borders;
+
+    [ReadOnly]
+    public float simulationStep;
+    [ReadOnly]
+    public float destinationForce_relaxationTime;
+    [ReadOnly]
+    public float pedestrianForce_v;
+    [ReadOnly]
+    public float pedestrianForce_sigma;
+    [ReadOnly]
+    public float pedestrianForce_deltaT;
+    [ReadOnly]
+    public float borderForce_u;
+    [ReadOnly]
+    public float borderForce_r;
+    [ReadOnly]
+    public float sight_phi;
+    [ReadOnly]
+    public float sight_c;
+
+
+    public void Execute(int index)
+    {
+        var prevState = prevPedestrians[index];
+        var curState = prevState;
+
+        curState.desiredDirection = GetDesiredDirection(in curState, in destinations);
+
+        var force = float3.zero;
+        force += GetDestinationForce(in curState);
+        force += GetPedestrianForce(in curState, index);
+        force += GetBorderForce(in curState);
+        // TODO: fluctuations ?
+
+        // remove translation on the y-axis
+        force.y = 0f;
+
+        // velocity
+        curState.velocity += force * simulationStep;
+        if (math.length(curState.velocity) > curState.maxSpeed)
+            curState.velocity = math.normalizesafe(curState.velocity) * curState.maxSpeed;
+
+        // position
+        curState.position += curState.velocity * simulationStep;
+
+        curPedestrians[index] = curState;
+    }
+
+
+    public static float3 GetDesiredDirection(in Pedestrian pedestrian, in NativeArray<Destination> destinations)
+    {
+        float3 minToDestVector = -pedestrian.position;
+        float minDistance = float.MaxValue;
+
+        for (int i = 0; i < destinations.Length; i++)
+        {
+            var destPosition = destinations[i].position;
+            var toDestVector = destPosition - pedestrian.position;
+            var destDistance = math.length(toDestVector);
+
+            if (destDistance < minDistance)
+            {
+                minDistance = destDistance;
+                minToDestVector = toDestVector;
+            }
+        }
+
+        return math.normalizesafe(minToDestVector);
+    }
+
+    private float3 GetDestinationForce(in Pedestrian pedestrian)
+    {
+        return (pedestrian.desiredSpeed * pedestrian.desiredDirection - pedestrian.velocity) / destinationForce_relaxationTime;
+    }
+
+    private float3 GetPedestrianForce(in Pedestrian pedestrian, int index)
+    {
+        var pedestrianForce = float3.zero;
+
+        for (int i = 0; i < prevPedestrians.Length; i++)
+        {
+            if (i == index) continue;
+
+            var beta = prevPedestrians[i];
+            var v_beta_deltaT = math.length(beta.velocity) * pedestrianForce_deltaT;
+            var nextPos_beta = v_beta_deltaT * beta.desiredDirection;
+
+            var r_ab = pedestrian.position - beta.position;
+            var r_ab_norm = math.length(r_ab);
+            var r_ab_step_norm = math.length(r_ab - nextPos_beta);
+            var r_ab_norm_r_ab_step_norm = r_ab_norm + r_ab_step_norm;
+
+            var b = math.sqrt(math.pow(r_ab_norm_r_ab_step_norm, 2f) - math.pow(v_beta_deltaT, 2f)) / 2f;
+
+            var force = pedestrianForce_v * math.exp(-b / pedestrianForce_sigma) *
+                        r_ab_norm_r_ab_step_norm / (4f * b * pedestrianForce_sigma) *
+                        (r_ab / r_ab_norm + (r_ab - nextPos_beta) / r_ab_step_norm);
+
+            if (math.dot(pedestrian.desiredDirection, -force) < math.length(force) * math.cos(sight_phi))
+                force *= sight_c;
+            
+            pedestrianForce += force;
+        }
+
+        return pedestrianForce;
+    }
+
+    private float3 GetBorderForce(in Pedestrian pedestrian)
+    {
+        var force = float3.zero;
+
+        for (int i = 0; i < borders.Length; i++)
+        {
+            var r_ab = pedestrian.position - GetNearestPoint(in pedestrian, borders[i]);
+            var r_ab_norm = math.length(r_ab);
+            force += borderForce_u * math.exp(-r_ab_norm / borderForce_r) / (r_ab_norm * borderForce_r) * r_ab;
+        }
+
+        return force;
+    }
+
+    private static float3 GetNearestPoint(in Pedestrian pedestrian, in Border border)
+    {
+        // TODO : robust implementation
+        return border.position;
+    }
+}
+
+// [BurstCompile]
+public struct UpdatePeopleJob : IJobParallelForTransform
+{
+    [ReadOnly]
+    public NativeArray<Pedestrian> pedestrians;
+
+
+    public void Execute(int index, TransformAccess transformAccess)
+    {
+        transformAccess.position = pedestrians[index].position;
+    }
+}
+
+
+[Serializable]
+public enum ExecutionType
+{
+    Serial, MultiThread
+}
+
+
+public class SocialForceManager : MonoBehaviour
+{
+    public ExecutionType executionType;
+    [Range(1, 32)]
+    public int batchSize;
+
+
+    private People[] peoples;
+    private NativeArray<Pedestrian> prevPedestrians;
+    private NativeArray<Pedestrian> curPedestrians;
+    private TransformAccessArray peopleTransformAccessArray;
+    private Exit[] exits;
+    private NativeArray<Destination> destinations;
+    private Wall[] walls;
+    private NativeArray<Border> borders;
+
+    private Unity.Mathematics.Random random = new (1u);
+
+    private UpdatePedestriansJob updatePedestriansJob;
+    private UpdatePeopleJob updatePeopleJob;
+
+    private ProfilerMarker profilerMarker_SFM = new ("SFM");
+    private ProfilerMarker profilerMarker_updatePedestrians = new ("Update Pedestrians");
+    private ProfilerMarker profilerMarker_updatePeople = new ("Update People");
+
+
+    // constants
+    // TODO: expose to the inspector ?
+    private const float DESIRED_SPEED_MEAN = 1.34f;
+    private const float DESIRED_SPEED_STDDEV = .26f;
+    private const float MAX_SPEED_FACTOR = 1.3f;
+    private const float DESTINATION_FORCE_RELAXATION_TIME = .5f;
+    private const float PEDESTRIAN_FORCE_V = 2.1f;
+    private const float PEDESTRIAN_FORCE_SIGMA = .3f;
+    private const float PEDESTRIAN_FORCE_DELTA_T = 2f;
+    private const float BORDER_FORCE_U = 10f;
+    private const float BORDER_FORCE_R = .2f;
+    private const float SIGHT_PHI = 100f * Mathf.Deg2Rad;
+    private const float SIGHT_C = .5f;
+
+
+    private void Start()
+    {
+        InitDestinations();
+        InitBorders();
+        InitPedestrians();
+        InitJobs();
+    }
+
+    private void FixedUpdate()
+    {
+        profilerMarker_SFM.Begin();
+
+        // udpate jobs
+        updatePedestriansJob.prevPedestrians = prevPedestrians;
+        updatePedestriansJob.curPedestrians = curPedestrians;
+        updatePedestriansJob.simulationStep = Time.fixedDeltaTime;
+
+        // update pedestrians
+        profilerMarker_updatePedestrians.Begin();
+
+        if (executionType == ExecutionType.Serial)
+            for (int i = 0; i < prevPedestrians.Length; i++)
+                updatePedestriansJob.Execute(i);
+        else if (executionType == ExecutionType.MultiThread)
+            updatePedestriansJob.Schedule(prevPedestrians.Length, batchSize).Complete();
+
+        profilerMarker_updatePedestrians.End();
+
+        // update people
+        profilerMarker_updatePeople.Begin();
+
+        if (executionType == ExecutionType.Serial)
+            for (int i = 0; i < curPedestrians.Length; i++)
+                peoples[i].transform.position = curPedestrians[i].position;
+        else if (executionType == ExecutionType.MultiThread)
+        {
+            updatePeopleJob.pedestrians = curPedestrians;
+            updatePeopleJob.Schedule(peopleTransformAccessArray).Complete();
+        }
+
+        profilerMarker_updatePeople.End();
+
+        // swap pedestrians
+        NativeArray<Pedestrian> temp;
+        temp = prevPedestrians;
+        prevPedestrians = curPedestrians;
+        curPedestrians = temp;
+
+        profilerMarker_SFM.End();
+    }
+
+    private void OnDestroy()
+    {
+        prevPedestrians.Dispose();
+        curPedestrians.Dispose();
+        destinations.Dispose();
+        borders.Dispose();
+        peopleTransformAccessArray.Dispose();
+    }
+
+
+    private void InitPedestrians()
+    {
+        peoples = FindObjectsOfType<People>();
+        prevPedestrians = new NativeArray<Pedestrian>(peoples.Length, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+        curPedestrians = new NativeArray<Pedestrian>(peoples.Length, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+        peopleTransformAccessArray = new TransformAccessArray(peoples.Length);
+
+        for (int i = 0; i < prevPedestrians.Length; i++)
+        {
+            var state = new Pedestrian();
+
+            state.position = peoples[i].transform.position;
+            state.velocity = float3.zero;
+            state.desiredDirection = UpdatePedestriansJob.GetDesiredDirection(in state, in destinations);
+            state.desiredSpeed = SampleGaussian(DESIRED_SPEED_MEAN, DESIRED_SPEED_STDDEV);
+            state.maxSpeed = state.desiredSpeed * MAX_SPEED_FACTOR;
+
+            prevPedestrians[i] = state;
+
+            peopleTransformAccessArray.Add(peoples[i].transform);
+        }
+    }
+
+    private void InitDestinations()
+    {
+        exits = FindObjectsOfType<Exit>();
+        destinations = new NativeArray<Destination>(exits.Length, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+
+        for (int i = 0; i < destinations.Length; i++)
+        {
+            var destination = new Destination()
+            {
+                position = exits[i].transform.position
+            };
+            
+            destinations[i] = destination;
+        }
+    }
+
+    private void InitBorders()
+    {
+        walls = FindObjectsOfType<Wall>();
+        borders = new NativeArray<Border>(walls.Length, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+
+        for (int i = 0; i < borders.Length; i++)
+        {
+            var border = new Border()
+            {
+                position = walls[i].transform.position
+            };
+
+            borders[i] = border;
+        }
+    }
+
+    private void InitJobs()
+    {
+        updatePedestriansJob = new ()
+        {
+            destinations = destinations,
+            borders = borders,
+
+            destinationForce_relaxationTime = DESTINATION_FORCE_RELAXATION_TIME,
+            pedestrianForce_v = PEDESTRIAN_FORCE_V,
+            pedestrianForce_sigma = PEDESTRIAN_FORCE_SIGMA,
+            pedestrianForce_deltaT = PEDESTRIAN_FORCE_DELTA_T,
+            borderForce_u = BORDER_FORCE_U,
+            borderForce_r = BORDER_FORCE_R,
+            sight_phi = SIGHT_PHI,
+            sight_c = SIGHT_C
+        };
+
+        updatePeopleJob = new ();
+    }
+
+
+    private float SampleGaussian(float mean, float stddev)
+    {
+        // The method requires sampling from a uniform random of (0,1]
+        // but Random.NextDouble() returns a sample of [0,1).
+        var u = random.NextFloat2();
+        u = math.float2(1f) - u;
+
+        var y = math.sqrt(-2f * math.log(u.x)) * math.cos(2f * math.PI * u.y);
+        return y * stddev + mean;
+    }
+}

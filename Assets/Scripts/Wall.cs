@@ -8,7 +8,7 @@ public class Wall : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        Debug.Log("I am a wall");
+        // Debug.Log("I am a wall");
     }
 
     // Update is called once per frame
