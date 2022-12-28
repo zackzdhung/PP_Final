@@ -8,6 +8,8 @@ using Unity.Collections;
 using Unity.Burst;
 using Unity.Mathematics;
 using Unity.Profiling;
+using UnityEngine.Assertions.Must;
+using UnityEngine.UIElements;
 
 
 // TODO: Burst Compiler ? SIMD ?
@@ -24,6 +26,8 @@ public struct Pedestrian
 public struct Border
 {
     public float3 position;
+    public float3 normalVec;
+    public float length;
     // TODO: rectangle borders
 }
 
@@ -155,9 +159,9 @@ public struct UpdatePedestriansJob : IJobParallelFor
     {
         var force = float3.zero;
 
-        for (int i = 0; i < borders.Length; i++)
+        foreach (var border in borders)
         {
-            var r_ab = pedestrian.position - GetNearestPoint(in pedestrian, borders[i]);
+            var r_ab = pedestrian.position - GetNearestPoint(in pedestrian, border);
             var r_ab_norm = math.length(r_ab);
             force += borderForce_u * math.exp(-r_ab_norm / borderForce_r) / (r_ab_norm * borderForce_r) * r_ab;
         }
@@ -168,7 +172,18 @@ public struct UpdatePedestriansJob : IJobParallelFor
     private static float3 GetNearestPoint(in Pedestrian pedestrian, in Border border)
     {
         // TODO : robust implementation
-        return border.position;
+        if (!(math.length(border.normalVec) > 0)) return border.position;
+        
+        var pedestrianToBorder = border.position - pedestrian.position;
+        var vec = math.dot(pedestrianToBorder, border.normalVec) * border.normalVec;
+        var res = pedestrian.position + vec;
+
+        if (math.length(res - border.position) > border.length / 2)
+        {
+            res = border.position + math.normalize(res - border.position) * border.length / 2;
+        }
+        
+        return res;
     }
 }
 
@@ -180,7 +195,7 @@ public struct UpdatePeopleJob : IJobParallelForTransform
 
 
     public void Execute(int index, TransformAccess transformAccess)
-    {
+    {  
         transformAccess.position = pedestrians[index].position;
     }
 }
@@ -206,7 +221,7 @@ public class SocialForceManager : MonoBehaviour
     private TransformAccessArray peopleTransformAccessArray;
     private Exit[] exits;
     private NativeArray<Destination> destinations;
-    private Wall[] walls;
+    private Obstacle[] walls;
     private NativeArray<Border> borders;
 
     private Unity.Mathematics.Random random = new (1u);
@@ -246,7 +261,7 @@ public class SocialForceManager : MonoBehaviour
     {
         profilerMarker_SFM.Begin();
 
-        // udpate jobs
+        // update jobs
         updatePedestriansJob.prevPedestrians = prevPedestrians;
         updatePedestriansJob.curPedestrians = curPedestrians;
         updatePedestriansJob.simulationStep = Time.fixedDeltaTime;
@@ -254,24 +269,36 @@ public class SocialForceManager : MonoBehaviour
         // update pedestrians
         profilerMarker_updatePedestrians.Begin();
 
-        if (executionType == ExecutionType.Serial)
-            for (int i = 0; i < prevPedestrians.Length; i++)
-                updatePedestriansJob.Execute(i);
-        else if (executionType == ExecutionType.MultiThread)
-            updatePedestriansJob.Schedule(prevPedestrians.Length, batchSize).Complete();
+        switch (executionType)
+        {
+            case ExecutionType.Serial:
+            {
+                for (int i = 0; i < prevPedestrians.Length; i++)
+                    updatePedestriansJob.Execute(i);
+                break;
+            }
+            case ExecutionType.MultiThread:
+                updatePedestriansJob.Schedule(prevPedestrians.Length, batchSize).Complete();
+                break;
+        }
 
         profilerMarker_updatePedestrians.End();
 
         // update people
         profilerMarker_updatePeople.Begin();
 
-        if (executionType == ExecutionType.Serial)
-            for (int i = 0; i < curPedestrians.Length; i++)
-                peoples[i].transform.position = curPedestrians[i].position;
-        else if (executionType == ExecutionType.MultiThread)
+        switch (executionType)
         {
-            updatePeopleJob.pedestrians = curPedestrians;
-            updatePeopleJob.Schedule(peopleTransformAccessArray).Complete();
+            case ExecutionType.Serial:
+            {
+                for (int i = 0; i < curPedestrians.Length; i++)
+                    peoples[i].transform.position = curPedestrians[i].position;
+                break;
+            }
+            case ExecutionType.MultiThread:
+                updatePeopleJob.pedestrians = curPedestrians;
+                updatePeopleJob.Schedule(peopleTransformAccessArray).Complete();
+                break;
         }
 
         profilerMarker_updatePeople.End();
@@ -304,10 +331,12 @@ public class SocialForceManager : MonoBehaviour
 
         for (int i = 0; i < prevPedestrians.Length; i++)
         {
-            var state = new Pedestrian();
+            var state = new Pedestrian
+            {
+                position = peoples[i].transform.position,
+                velocity = float3.zero
+            };
 
-            state.position = peoples[i].transform.position;
-            state.velocity = float3.zero;
             state.desiredDirection = UpdatePedestriansJob.GetDesiredDirection(in state, in destinations);
             state.desiredSpeed = SampleGaussian(DESIRED_SPEED_MEAN, DESIRED_SPEED_STDDEV);
             state.maxSpeed = state.desiredSpeed * MAX_SPEED_FACTOR;
@@ -325,7 +354,7 @@ public class SocialForceManager : MonoBehaviour
 
         for (int i = 0; i < destinations.Length; i++)
         {
-            var destination = new Destination()
+            var destination = new Destination
             {
                 position = exits[i].transform.position
             };
@@ -336,14 +365,16 @@ public class SocialForceManager : MonoBehaviour
 
     private void InitBorders()
     {
-        walls = FindObjectsOfType<Wall>();
+        walls = FindObjectsOfType<Obstacle>();
         borders = new NativeArray<Border>(walls.Length, Allocator.Persistent, NativeArrayOptions.ClearMemory);
 
         for (int i = 0; i < borders.Length; i++)
         {
-            var border = new Border()
+            var border = new Border
             {
-                position = walls[i].transform.position
+                position = walls[i].transform.position,
+                normalVec = walls[i].normalVec,
+                length = walls[i].length
             };
 
             borders[i] = border;
@@ -352,7 +383,7 @@ public class SocialForceManager : MonoBehaviour
 
     private void InitJobs()
     {
-        updatePedestriansJob = new ()
+        updatePedestriansJob = new UpdatePedestriansJob
         {
             destinations = destinations,
             borders = borders,
@@ -367,7 +398,7 @@ public class SocialForceManager : MonoBehaviour
             sight_c = SIGHT_C
         };
 
-        updatePeopleJob = new ();
+        updatePeopleJob = new UpdatePeopleJob();
     }
 
 

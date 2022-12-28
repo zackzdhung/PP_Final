@@ -6,11 +6,11 @@ public class CreateObjects : MonoBehaviour
 {
     public GameObject mObject;
     // public GameObject copyHuman;
-    public int numberOfPeople = 2;
+    public int num = 2;
     public ObjectId id;
     public enum ObjectId
     {
-        Wall,
+        Obstacle,
         People,
         Exit
     }
@@ -24,7 +24,7 @@ public class CreateObjects : MonoBehaviour
 
         switch (id)
         {
-            case ObjectId.Wall:
+            case ObjectId.Obstacle:
                 xRange = 19;
                 y = 0.5f;
                 zRange = 19;
@@ -46,7 +46,7 @@ public class CreateObjects : MonoBehaviour
                 break;
         }
         
-        for (var i = 0; i < numberOfPeople; i++)
+        for (var i = 0; i < num; i++)
         {
             Vector3 position = new Vector3(Random.Range(xRange, -xRange), y, Random.Range(zRange, -zRange));
             GameObject newObject = Instantiate(mObject);

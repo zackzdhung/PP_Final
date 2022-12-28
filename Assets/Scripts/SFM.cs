@@ -41,7 +41,7 @@ public class SFM : MonoBehaviour
     private double U_0_ab = 10;
     private double R = 0.2;
 
-    private Wall[] _walls;
+    private Obstacle[] _walls;
     private People[] _peoples;
     private Vector3[] _moveDistances;
     private Exit[] _exits;
@@ -51,7 +51,7 @@ public class SFM : MonoBehaviour
     void Start()
     {
         // _init = false;
-        _walls = FindObjectsOfType<Wall>();
+        _walls = FindObjectsOfType<Obstacle>();
         _peoples = FindObjectsOfType<People>();
         _exits = FindObjectsOfType<Exit>();
         _nearestExits = new Exit[_peoples.Length];
@@ -152,16 +152,16 @@ public class SFM : MonoBehaviour
         if (_walls.Length > 0)
         {
             //Debug.Log("walls Length > 0");
-            Wall nearestWall = _walls[0];
+            Obstacle nearestObstacle = _walls[0];
             for (int i = 1; i < _walls.Length; i++)
             {
-                if (Vector3.Distance(myself.transform.position, _walls[i].transform.position) < Vector3.Distance(myself.transform.position, nearestWall.transform.position))
+                if (Vector3.Distance(myself.transform.position, _walls[i].transform.position) < Vector3.Distance(myself.transform.position, nearestObstacle.transform.position))
                 {
-                    nearestWall = _walls[i];
+                    nearestObstacle = _walls[i];
                 }
             }
 
-            Vector3 wallRepulsion = U_ab_gradient(myself, nearestWall);
+            Vector3 wallRepulsion = U_ab_gradient(myself, nearestObstacle);
             motivate += wallRepulsion;
         }
         
@@ -247,10 +247,10 @@ public class SFM : MonoBehaviour
 
     // The Repulsion between people and Wall
     // Note that only consider the nearest wall
-    Vector3 U_ab_gradient(People me, Wall wall)
+    Vector3 U_ab_gradient(People me, Obstacle obstacle)
     {
         Vector3 myPosition = me.transform.position;
-        Vector3 wallPosition = wall.transform.position;
+        Vector3 wallPosition = obstacle.transform.position;
         Vector3 r_ab = myPosition - wallPosition;
         double r_ab_norm = Vector3.Distance(r_ab, Vector3.zero);
         //Debug.Log(r_ab_norm);
