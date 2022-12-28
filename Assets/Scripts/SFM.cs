@@ -152,16 +152,16 @@ public class SFM : MonoBehaviour
         if (_walls.Length > 0)
         {
             //Debug.Log("walls Length > 0");
-            Obstacle nearestObstacle = _walls[0];
+            Obstacle nearestWall = _walls[0];
             for (int i = 1; i < _walls.Length; i++)
             {
-                if (Vector3.Distance(myself.transform.position, _walls[i].transform.position) < Vector3.Distance(myself.transform.position, nearestObstacle.transform.position))
+                if (Vector3.Distance(myself.transform.position, _walls[i].transform.position) < Vector3.Distance(myself.transform.position, nearestWall.transform.position))
                 {
-                    nearestObstacle = _walls[i];
+                    nearestWall = _walls[i];
                 }
             }
 
-            Vector3 wallRepulsion = U_ab_gradient(myself, nearestObstacle);
+            Vector3 wallRepulsion = U_ab_gradient(myself, nearestWall);
             motivate += wallRepulsion;
         }
         
@@ -247,10 +247,10 @@ public class SFM : MonoBehaviour
 
     // The Repulsion between people and Wall
     // Note that only consider the nearest wall
-    Vector3 U_ab_gradient(People me, Obstacle obstacle)
+    Vector3 U_ab_gradient(People me, Obstacle wall)
     {
         Vector3 myPosition = me.transform.position;
-        Vector3 wallPosition = obstacle.transform.position;
+        Vector3 wallPosition = wall.transform.position;
         Vector3 r_ab = myPosition - wallPosition;
         double r_ab_norm = Vector3.Distance(r_ab, Vector3.zero);
         //Debug.Log(r_ab_norm);
