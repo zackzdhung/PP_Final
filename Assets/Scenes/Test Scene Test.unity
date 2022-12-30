@@ -203,13 +203,21 @@ PrefabInstance:
     m_TransformParent: {fileID: 1022237754}
     m_Modifications:
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
-      propertyPath: midpoint
-      value: 
-      objectReference: {fileID: 2031156745}
+      propertyPath: midpoints.Array.size
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
       propertyPath: destinations.Array.size
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
+      propertyPath: midpoints.Array.data[0]
+      value: 
+      objectReference: {fileID: 2031156745}
+    - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
+      propertyPath: midpoints.Array.data[1]
+      value: 
+      objectReference: {fileID: 1809963202}
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
       propertyPath: destinations.Array.data[0]
       value: 
@@ -426,13 +434,21 @@ PrefabInstance:
     m_TransformParent: {fileID: 1022237754}
     m_Modifications:
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
-      propertyPath: midpoint
-      value: 
-      objectReference: {fileID: 905366450}
+      propertyPath: midpoints.Array.size
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
       propertyPath: destinations.Array.size
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
+      propertyPath: midpoints.Array.data[0]
+      value: 
+      objectReference: {fileID: 498689972}
+    - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
+      propertyPath: midpoints.Array.data[1]
+      value: 
+      objectReference: {fileID: 905366450}
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
       propertyPath: destinations.Array.data[0]
       value: 
@@ -1087,13 +1103,21 @@ PrefabInstance:
     m_TransformParent: {fileID: 1022237754}
     m_Modifications:
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
-      propertyPath: midpoint
-      value: 
-      objectReference: {fileID: 1285623493}
+      propertyPath: midpoints.Array.size
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
       propertyPath: destinations.Array.size
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
+      propertyPath: midpoints.Array.data[0]
+      value: 
+      objectReference: {fileID: 1285623493}
+    - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
+      propertyPath: midpoints.Array.data[1]
+      value: 
+      objectReference: {fileID: 1506630988}
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
       propertyPath: destinations.Array.data[0]
       value: 
@@ -1535,13 +1559,21 @@ PrefabInstance:
     m_TransformParent: {fileID: 1022237754}
     m_Modifications:
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
-      propertyPath: midpoint
-      value: 
-      objectReference: {fileID: 484860617}
+      propertyPath: midpoints.Array.size
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
       propertyPath: destinations.Array.size
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
+      propertyPath: midpoints.Array.data[0]
+      value: 
+      objectReference: {fileID: 484860617}
+    - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
+      propertyPath: midpoints.Array.data[1]
+      value: 
+      objectReference: {fileID: 296035665}
     - target: {fileID: 7505298766068275674, guid: 63c9c9b3126531b4c92115b6ceb2a611, type: 3}
       propertyPath: destinations.Array.data[0]
       value: 

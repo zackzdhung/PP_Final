@@ -21,6 +21,8 @@ public struct Pedestrian
     public float3 desiredDirection;
     public float desiredSpeed;
     public float maxSpeed;
+    public int desiredExitIndex;
+    public int midpointIndex;
 }
 
 public struct Border
@@ -34,6 +36,8 @@ public struct Border
 public struct Destination
 {
     public float3 position;
+    public int midpointsStartIndex;
+    public int midpointsLength;
 }
 
 
@@ -48,6 +52,8 @@ public struct UpdatePedestriansJob : IJobParallelFor
     public NativeArray<Destination> destinations;
     [ReadOnly]
     public NativeArray<Border> borders;
+    [ReadOnly] 
+    public NativeArray<float3> midpoints;
 
     [ReadOnly]
     public float simulationStep;
@@ -74,7 +80,15 @@ public struct UpdatePedestriansJob : IJobParallelFor
         var prevState = prevPedestrians[index];
         var curState = prevState;
 
-        curState.desiredDirection = GetDesiredDirection(in curState, in destinations);
+        curState.desiredExitIndex = GetDesiredExitIndex(in curState, in destinations);
+
+
+        curState.midpointIndex = GetMidpointIndex(in curState, in destinations, in midpoints);
+
+        
+        curState.desiredDirection = GetDesiredDirection(in curState, in midpoints);
+
+        // curState.desiredDirection = GetDesiredDirection(in curState, in destinations);
 
         var force = float3.zero;
         force += GetDestinationForce(in curState);
@@ -97,25 +111,61 @@ public struct UpdatePedestriansJob : IJobParallelFor
     }
 
 
-    public static float3 GetDesiredDirection(in Pedestrian pedestrian, in NativeArray<Destination> destinations)
+    public static int GetDesiredExitIndex(in Pedestrian pedestrian, in NativeArray<Destination> destinations, bool init = false)
     {
-        float3 minToDestVector = -pedestrian.position;
-        float minDistance = float.MaxValue;
-
-        for (int i = 0; i < destinations.Length; i++)
+        if (!init) return pedestrian.desiredExitIndex;
+        int res = 0;
+        float curDist = float.MaxValue;
+        for (var i = 0; i < destinations.Length; i++)
         {
-            var destPosition = destinations[i].position;
-            var toDestVector = destPosition - pedestrian.position;
-            var destDistance = math.length(toDestVector);
-
-            if (destDistance < minDistance)
+            var destination = destinations[i];
+            var dist = math.length(destination.position - pedestrian.position);
+            if (dist < curDist)
             {
-                minDistance = destDistance;
-                minToDestVector = toDestVector;
+                curDist = dist;
+                res = i;
             }
         }
+        return res;
+    }
+    
+    public static int GetMidpointIndex(in Pedestrian pedestrian, in NativeArray<Destination> destinations, in NativeArray<float3> midpoints, bool init = false)
+    {
+        if (init)
+        {
+            return destinations[pedestrian.desiredExitIndex].midpointsStartIndex;
+        }
+        var toDestVec = midpoints[pedestrian.midpointIndex] - pedestrian.position;
+        return math.length(toDestVec) < 5f ? math.min( destinations[pedestrian.desiredExitIndex].midpointsStartIndex + destinations[pedestrian.desiredExitIndex].midpointsLength - 1, pedestrian.midpointIndex + 1) : pedestrian.midpointIndex;
+    }
 
-        return math.normalizesafe(minToDestVector);
+
+    // public static float3 GetDesiredDirection(in Pedestrian pedestrian, in NativeArray<Destination> destinations)
+    public static float3 GetDesiredDirection(in Pedestrian pedestrian, in NativeArray<float3> midpoints)
+    {
+        // float3 minToDestVector = -pedestrian.position;
+        // float minDistance = float.MaxValue;
+        //
+        // for (int i = 0; i < destinations.Length; i++)
+        // {
+        //     var destPosition = destinations[i].position;
+        //     var toDestVector = destPosition - pedestrian.position;
+        //     var destDistance = math.length(toDestVector);
+        //
+        //     if (destDistance < minDistance)
+        //     {
+        //         minDistance = destDistance;
+        //         minToDestVector = toDestVector;
+        //     }
+        // }
+        
+        
+        // return math.normalizesafe(minToDestVector);
+        
+        var destPosition = midpoints[pedestrian.midpointIndex];
+        var toDestVector = destPosition - pedestrian.position;
+        
+        return math.normalizesafe(toDestVector);
     }
 
     private float3 GetDestinationForce(in Pedestrian pedestrian)
@@ -221,6 +271,7 @@ public class SocialForceManager : MonoBehaviour
     private TransformAccessArray peopleTransformAccessArray;
     private Exit[] exits;
     private NativeArray<Destination> destinations;
+    private NativeArray<float3> midpoints;
     private Obstacle[] walls;
     private NativeArray<Border> borders;
 
@@ -317,6 +368,7 @@ public class SocialForceManager : MonoBehaviour
         prevPedestrians.Dispose();
         curPedestrians.Dispose();
         destinations.Dispose();
+        midpoints.Dispose();
         borders.Dispose();
         peopleTransformAccessArray.Dispose();
     }
@@ -331,13 +383,16 @@ public class SocialForceManager : MonoBehaviour
 
         for (int i = 0; i < prevPedestrians.Length; i++)
         {
+            
             var state = new Pedestrian
             {
                 position = peoples[i].transform.position,
-                velocity = float3.zero
+                velocity = float3.zero,
             };
 
-            state.desiredDirection = UpdatePedestriansJob.GetDesiredDirection(in state, in destinations);
+            state.desiredExitIndex = UpdatePedestriansJob.GetDesiredExitIndex(in state, in destinations, true);
+            state.midpointIndex = UpdatePedestriansJob.GetMidpointIndex(in state, in destinations, in midpoints, true);
+            state.desiredDirection = UpdatePedestriansJob.GetDesiredDirection(in state, in midpoints);
             state.desiredSpeed = SampleGaussian(DESIRED_SPEED_MEAN, DESIRED_SPEED_STDDEV);
             state.maxSpeed = state.desiredSpeed * MAX_SPEED_FACTOR;
 
@@ -352,14 +407,37 @@ public class SocialForceManager : MonoBehaviour
         exits = FindObjectsOfType<Exit>();
         destinations = new NativeArray<Destination>(exits.Length, Allocator.Persistent, NativeArrayOptions.ClearMemory);
 
+        var midpointsNum = 0;
+
         for (int i = 0; i < destinations.Length; i++)
         {
+            for (int j = 0; j < midpoints.Length; j++)
+            {
+                midpoints[j] = exits[i].midpoints[j].transform.position;
+            }
+
             var destination = new Destination
             {
-                position = exits[i].transform.position
+                position = exits[i].transform.position,
+                midpointsStartIndex = midpointsNum,
+                midpointsLength = exits[i].midpoints.Length
             };
-            
+
             destinations[i] = destination;
+            midpointsNum += exits[i].midpoints.Length;
+        }
+
+        midpoints = new NativeArray<float3>(midpointsNum, Allocator.Persistent);
+
+        var idx = 0;
+
+        foreach (var exit in exits)
+        {
+            foreach (var midpoint in exit.midpoints)
+            {
+                midpoints[idx] = midpoint.transform.position;
+                idx++;
+            }
         }
     }
 
@@ -386,6 +464,7 @@ public class SocialForceManager : MonoBehaviour
         updatePedestriansJob = new UpdatePedestriansJob
         {
             destinations = destinations,
+            midpoints = midpoints,
             borders = borders,
 
             destinationForce_relaxationTime = DESTINATION_FORCE_RELAXATION_TIME,
