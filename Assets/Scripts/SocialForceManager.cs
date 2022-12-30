@@ -244,7 +244,7 @@ public class SocialForceManager : MonoBehaviour
     private const float PEDESTRIAN_FORCE_SIGMA = .3f;
     private const float PEDESTRIAN_FORCE_DELTA_T = 2f;
     private const float BORDER_FORCE_U = 10f;
-    private const float BORDER_FORCE_R = .2f;
+    private const float BORDER_FORCE_R = .9f;
     private const float SIGHT_PHI = 100f * Mathf.Deg2Rad;
     private const float SIGHT_C = .5f;
 
